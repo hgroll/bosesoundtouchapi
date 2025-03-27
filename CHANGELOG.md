@@ -6,6 +6,10 @@ Change are listed in reverse chronological order (newest to oldest).
 
 <span class="changelog">
 
+###### [ 1.0.75 ] - 2025/03/27
+
+  * Updated underlying `smartinspectpython` package requirement to version 3.0.36.
+
 ###### [ 1.0.74 ] - 2025/03/06
 
   * Corrected an `AudioDspControls` bug that was not setting the `VideoSyncAudioDelay` value correctly when the `AudioMode` value was switched.
