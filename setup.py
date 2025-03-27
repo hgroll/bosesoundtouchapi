@@ -59,7 +59,7 @@ setup(
     install_requires=[
         'platformdirs>=4.1.0',
         'requests>=2.31.0',
-        'smartinspectpython>=3.0.35',
+        'smartinspectpython>=3.0.37',
         'tinytag==1.10.0',
         'urllib3>=1.21.1,<1.27',
         'websocket-client==1.6.4',
