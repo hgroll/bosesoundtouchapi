@@ -1,6 +1,6 @@
 # external package imports.
 import re
-import telnetlib 
+import socket
 from urllib3 import PoolManager, ProxyManager, Timeout, HTTPResponse
 from xml.etree.ElementTree import Element, fromstring
 
@@ -445,13 +445,14 @@ class SoundTouchDevice:
             _logsi.LogVerbose(MSG_TRACE_DEVICE_COMMAND_WITH_PARM % ("RebootDevice", self.Host, self.DeviceName))
             
             # open a connection to the ssh server running on the device (port 17000 default).
-            conn = telnetlib.Telnet(self.Host, sshPort) 
+            conn = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            conn.connect((self.Host, sshPort))
 
             # send reboot system command.
-            conn.write(b"sys reboot\n")
+            conn.sendall(b"sys reboot\n")
         
             # receive response; decode if bytes received (expected).
-            response = conn.read_all()
+            response = conn.recv(100)
             if isinstance(response, bytes):
                 response = response.decode(encoding='utf-8')
             _logsi.LogVerbose("SSH Server response:\n%s" % response)
