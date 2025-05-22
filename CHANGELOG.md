@@ -6,6 +6,10 @@ Change are listed in reverse chronological order (newest to oldest).
 
 <span class="changelog">
 
+###### [ 1.0.77 ] - 2025/05/22
+
+  * Replaced `telnetlib` with native `socket` calls for python 3.13 requirements.
+
 ###### [ 1.0.76 ] - 2025/03/27
 
   * Updated underlying `smartinspectpython` package requirement to version 3.0.37.
