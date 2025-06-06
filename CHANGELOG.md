@@ -6,6 +6,12 @@ Change are listed in reverse chronological order (newest to oldest).
 
 <span class="changelog">
 
+###### [ 1.0.79 ] - 2025/06/06
+
+  * Updated method `SoundTouchClient.PlayNotificationTTS` to check if the currently playing source is a notification; if so, then a "MediaNextTrack" is issued to avoid the `request not supported while speaker resource is in use` exception.
+  * Fixed a bug in `_ProcessEvent_NowPlayingUpdated` method that was causing an exception if the current ContentItem was not set.
+  * Various documentation updates.
+
 ###### [ 1.0.78 ] - 2025/06/06
 
   * Added method `SoundTouchClient.PlayUrlDlna` to play media from the given URL via the Bose DLNA API.

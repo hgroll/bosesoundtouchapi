@@ -2921,6 +2921,19 @@ class SoundTouchClient:
             volumeLevel = 10  
         if volumeLevel > 70:
             volumeLevel = 70
+
+        # retrieve nowPlaying status; if source is notification, then we must first
+        # call MediaNextTrack command before trying to play the specified url; failure to
+        # do so will result in the following error:
+        # id=409, name="HTTP_STATUS_CONFLICT", cause="request not supported while speaker resource is in use"
+        nowPlaying:NowPlayingStatus = self.GetNowPlayingStatus(True)
+        if nowPlaying is not None:
+            if nowPlaying.Source == SoundTouchSources.NOTIFICATION.value:
+                self.MediaNextTrack()
+                # give the device time to process the previous command.
+                delay:float = 1.0
+                _logsi.LogVerbose(MSG_TRACE_DELAY_DEVICE % (delay, self.Device.DeviceName))
+                time.sleep(delay)
         
         # replace sayText in the TTS url.
         ttsUrl = ttsUrl.format(saytext=urllib.parse.quote(sayText))
@@ -2935,7 +2948,7 @@ class SoundTouchClient:
 
     def PlayUrl(self, url:str, artist:str=None, album:str=None, track:str=None, 
                 volumeLevel:int=0, appKey:str=None, getMetaDataFromUrlFile:bool=False
-                ) -> SoundTouchMessage:
+        ) -> SoundTouchMessage:
         """
         Plays media from the given URL as a notification message, interrupting the currently playing 
         media to play the specified url.  The currently playing will then resume playing once play of 
@@ -3086,16 +3099,16 @@ class SoundTouchClient:
                 The url to play.  
                 Note that HTTPS URL's are not supported by this service due to DLNA restrictions.
             artist (str):
-                The message text that will appear in the NowPlaying Artist node, if source-specific nowPlaying information.  
+                The message text that will appear in the NowPlaying Artist node for source-specific nowPlaying information.  
                 Default is "Unknown Artist"
             album (str):
-                The message text that will appear in the NowPlaying Album node, if source-specific nowPlaying information.  
+                The message text that will appear in the NowPlaying Album node, for source-specific nowPlaying information.  
                 Default is "Unknown Album"
             track (str):
-                The message text that will appear in the NowPlaying Track node, if source-specific nowPlaying information.  
+                The message text that will appear in the NowPlaying Track node, for source-specific nowPlaying information.  
                 Default is "Unknown Track"
             artUrl (str):
-                A url link to the art image of the station (if present).  
+                A url link to a cover art image that represents the URL, for source-specific nowPlaying information.  
                 Default is None.  
             updateNowPlayingStatus (bool):
                 True (default) to update the source-specific nowPlaying information;

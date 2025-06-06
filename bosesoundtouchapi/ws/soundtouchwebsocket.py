@@ -374,7 +374,7 @@ class SoundTouchWebSocket:
                 # and within the first 10 seconds of play position.  we do this, as the device 
                 # generates a few nowPlayingUpdated events in various play states (buffering, playing, etc).
                 nowPlaying:NowPlayingStatus = NowPlayingStatus(root=event[0])
-                if (nowPlaying.IsPlaying) and (nowPlaying.Position < 10):
+                if (nowPlaying.IsPlaying) and (nowPlaying.Position < 10) and (nowPlaying.ContentItem is not None):
                          
                     # if SPOTIFY source, convert tracklisturl reference to uri reference.
                     # if the playing content is a context (e.g. artist, playlist, album, etc), then the
