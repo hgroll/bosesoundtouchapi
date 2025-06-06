@@ -2416,23 +2416,34 @@ class SoundTouchClient:
         ```
         </details>
         """
-        if not method or not msg:
+        if (not method) or (not msg) or (not msg.Uri):
             return 400 # bad request
 
-        if msg.Uri not in self.Device.SupportedUris:
-            return 400
+        # is this a directl url request?
+        if (isinstance(msg.Uri, str)) and (msg.Uri.startswith('http://') or msg.Uri.startswith('https://')):
 
-        url = f'http://{self.Device.Host}:{self.Device.Port}/{msg.Uri}'
+            # yes - use the message URI value as the URL to execute.
+            url = msg.Uri
+
+        else:
+
+            # no - ensure it is a supported uri, and format the url to execute.
+            if msg.Uri not in self.Device.SupportedUris:
+                return 400
+            url = f'http://{self.Device.Host}:{self.Device.Port}/{msg.Uri}'
         
         try:
             if msg.HasXmlMessage:
                 reqbody:str = msg.XmlMessage
-                reqbodyencoded:bytes = reqbody.encode('utf-8')
                 _logsi.LogXml(SILevel.Verbose, "SoundTouchClient http request: '%s' (with body)" % (url), reqbody, prettyPrint=True)
-                response = self._Manager.request(method, url, body=reqbodyencoded)
+                if msg.IsRequestDataEncoded:
+                    reqbodyencoded = reqbody
+                else:
+                    reqbodyencoded:bytes = reqbody.encode('utf-8')
+                response = self._Manager.request(method, url, body=reqbodyencoded, headers=msg.RequestHeaders)
             else:
                 _logsi.LogVerbose("SoundTouchClient http request: '%s'" % (url))
-                response = self._Manager.request(method, url)
+                response = self._Manager.request(method, url, headers=msg.RequestHeaders)
 
             _logsi.LogXml(SILevel.Verbose, "SoundTouchClient http response: (%s) %s" % (response.status, url), response.data.decode("utf-8"), prettyPrint=True)
             if _logsi.IsOn(SILevel.Debug):
@@ -2926,11 +2937,14 @@ class SoundTouchClient:
                 volumeLevel:int=0, appKey:str=None, getMetaDataFromUrlFile:bool=False
                 ) -> SoundTouchMessage:
         """
-        Plays media from the given URL.
+        Plays media from the given URL as a notification message, interrupting the currently playing 
+        media to play the specified url.  The currently playing will then resume playing once play of 
+        the specified URL is complete.  
 
         Args:
             url (str):
-                The url to play.
+                The url to play.  
+                Value must start with `http:` or `https:`.
             artist (str):
                 The message text that will appear in the NowPlaying Artist node.  
                 Default is "Unknown Artist"
@@ -2961,6 +2975,12 @@ class SoundTouchClient:
                 If the SoundTouch device encounters an error while trying to play the url
                 media content.
                 
+        This method should only be used to play URL streams that are short in nature, as they will
+        be played as notification messages on the device.  The currently playing content (if any) is 
+        paused while the given url content is played, and then resumed once the given url content ends.  
+        If the currently playing content is a url (or other "notification" source type), then the 
+        `MediaNextTrack` method will be called to stop the current play and the new source will be played.
+        
         The given url content is played at the level specified by the volumeLevel argument.
         Specify a volumeLevel of zero to play the given url content at the current volume level.
         The volume level is restored to the level it was before the given url content was 
@@ -2969,11 +2989,6 @@ class SoundTouchClient:
         effect prior to playing the given url content.  The SoundTouch device automatically takes 
         care of the volume level switching; there are no calls in the method to change the 
         volume or currently playing content status.
-        
-        The currently playing content (if any) is paused while the given url content
-        is played, and then resumed once the given url content ends.  If the currently
-        playing content is a url (or other "notification" source type), then the `MediaNextTrack`
-        method will be called to stop the current play and the new source will be played.
         
         If the device is the master controller of a zone, then the given url content will 
         be played on all devices that are members of the zone.
@@ -3027,6 +3042,10 @@ class SoundTouchClient:
         if nowPlaying is not None:
             if nowPlaying.Source == SoundTouchSources.NOTIFICATION.value:
                 self.MediaNextTrack()
+                # give the device time to process the previous command.
+                delay:float = 1.0
+                _logsi.LogVerbose(MSG_TRACE_DELAY_DEVICE % (delay, self.Device.DeviceName))
+                time.sleep(delay)
 
         # do we need to retrieve metadata from the url file itself?
         if getMetaDataFromUrlFile == True:
@@ -3046,6 +3065,157 @@ class SoundTouchClient:
         
         # make the request.
         self.MakeRequest('POST', message)
+        return message
+    
+    
+    def PlayUrlDlna(
+        self, 
+        url:str, 
+        artist:str=None, 
+        album:str=None, 
+        track:str=None, 
+        artUrl:str=None,
+        updateNowPlayingStatus:bool=True,
+        delay:float=1,
+        ) -> SoundTouchMessage:
+        """
+        Plays media from the given URL via the Bose DLNA API.
+
+        Args:
+            url (str):
+                The url to play.  
+                Note that HTTPS URL's are not supported by this service due to DLNA restrictions.
+            artist (str):
+                The message text that will appear in the NowPlaying Artist node, if source-specific nowPlaying information.  
+                Default is "Unknown Artist"
+            album (str):
+                The message text that will appear in the NowPlaying Album node, if source-specific nowPlaying information.  
+                Default is "Unknown Album"
+            track (str):
+                The message text that will appear in the NowPlaying Track node, if source-specific nowPlaying information.  
+                Default is "Unknown Track"
+            artUrl (str):
+                A url link to the art image of the station (if present).  
+                Default is None.  
+            updateNowPlayingStatus (bool):
+                True (default) to update the source-specific nowPlaying information;
+                False to not update the source-specific nowPlaying information.
+            delay (int):
+                Time delay (in seconds) to wait AFTER sending the play next track request if
+                the currently playing media is a notification source.
+                This delay will give the device time to process the change before another 
+                command is accepted.  
+                Default is 1; value range is 0 - 10.
+
+        Returns:                                
+            A `SoundTouchMessage` object storing the request uri, a payload that has been 
+            sent (optional), and the response as an `xml.etree.ElementTree.Element`.
+            
+        Raises:
+            SoundTouchError:
+                Url argument value does not start with 'http://'.  
+                If the SoundTouch device encounters an error while trying to play the url
+                media content.
+                
+        The given url content is played using the DLNA server on the SoundTouch device.  
+        This method calls the `SetAVTransportURI` DLNA command to play the media.  
+        
+        If the `updateNowPlayingStatus` argument is True, then a call is made to the `UpdateNowPlayingStatusForSource`
+        method to update source-specific nowPlaying details (artist, album, track, and art) for
+        the specified source / source account.  It does this as a convenience method, since the
+        Bose `nowPlaying` service will not return any media-specific information for UPNP context.
+        
+        If the device is the master controller of a zone, then the given url content will 
+        be played on all devices that are members of the zone.
+
+        <details>
+          <summary>Sample Code</summary>
+        ```python
+        .. include:: ../docs/include/samplecode/SoundTouchClient/PlayUrlDlna.py
+        ```
+        </details>
+        """
+        # validations.
+        if (url is None) or (not isinstance(url, str)):
+            _logsi.LogVerbose("A string url argument was not supplied; ignoring PlayUrlDlna request")
+            return
+        url = url.lstrip()
+
+        delay = self._ValidateDelay(delay, 1, 10)
+        
+        # only support http url's at this time (DLNA does not support https url's).
+        if not re.match(r'http://', url):
+           raise SoundTouchError("url argument value does not start with 'http://'", logsi=_logsi)
+       
+        if updateNowPlayingStatus is None:
+            updateNowPlayingStatus = True
+        if artist is None:
+            artist = "Unknown Artist"
+        if album is None:
+            album = "Unknown Album"
+        if track is None:
+            track = "Unknown Track"
+
+        # retrieve nowPlaying status; if source is notification, then we must first
+        # call MediaNextTrack command before trying to play the specified url; failure to
+        # do so will result in the following error:
+        # id=409, name="HTTP_STATUS_CONFLICT", cause="request not supported while speaker resource is in use"
+        nowPlaying:NowPlayingStatus = self.GetNowPlayingStatus(True)
+        if nowPlaying is not None:
+            if nowPlaying.Source == SoundTouchSources.NOTIFICATION.value:
+                self.MediaNextTrack()
+                # give the device time to process the previous command.
+                if delay > 0:
+                    _logsi.LogVerbose(MSG_TRACE_DELAY_DEVICE % (delay, self.Device.DeviceName))
+                    time.sleep(delay)
+
+        # build SOAP DLNA request - body.
+        soapXml:str = ""
+        soapXml = soapXml + "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
+        soapXml = soapXml + "<s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\" s:encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\">\n"
+        soapXml = soapXml + "  <s:Body>\n"
+        soapXml = soapXml + "    <u:SetAVTransportURI xmlns:u=\"urn:schemas-upnp-org:service:AVTransport:1\">\n"
+        soapXml = soapXml + "      <InstanceID>0</InstanceID><CurrentURIMetaData></CurrentURIMetaData><CurrentURI>{0}</CurrentURI>".format(url) + "\n"
+        soapXml = soapXml + "    </u:SetAVTransportURI>\n"
+        soapXml = soapXml + "  </s:Body>\n"
+        soapXml = soapXml + "</s:Envelope>"
+
+        # create message request - direct url (to device DLNA server).
+        soapUrl:str = "http://{0}:{1}/AVTransport/Control".format(self.Device.Host, self.Device.DlnaPort)
+        message = SoundTouchMessage(soapUrl, soapXml)
+        message.IsRequestDataEncoded = True
+
+        # build SOAP DLNA request - headers.
+        message.RequestHeaders["User-Agent"] = "bosesoundtouchapi"
+        message.RequestHeaders["Accept"] = "*/*"
+        message.RequestHeaders["Content-Type"] = "text/xml; charset=\"utf-8\""
+        message.RequestHeaders["HOST"] = "{0}:{1}".format(self.Device.Host, self.Device.DlnaPort)
+        message.RequestHeaders["SOAPACTION"] = "urn:schemas-upnp-org:service:AVTransport:1#SetAVTransportURI"
+
+        # make the request.
+        self.MakeRequest('POST', message)
+
+        # are we updating source-specific nowPlaying status?
+        if updateNowPlayingStatus:
+
+            # delay retrieval of the nowPlaying status, to give the device time to switch
+            # to the new media.
+            if delay > 0:
+                _logsi.LogVerbose(MSG_TRACE_DELAY_DEVICE % (delay, self.Device.DeviceName))
+                time.sleep(delay)
+
+            # retrieve nowPlaying status (should be UPNP).
+            nowPlaying:NowPlayingStatus = self.GetNowPlayingStatus(True)
+            if nowPlaying is not None:
+
+                # update source-specific nowPlaying status.
+                self.UpdateNowPlayingStatusForSource(source=nowPlaying.Source,
+                                                     sourceAccount=nowPlaying.SourceAccount,
+                                                     album=album,
+                                                     artist=artist,
+                                                     track=track,
+                                                     artUrl=artUrl)  
+        # return response to caller.
         return message
     
     
@@ -4930,6 +5100,7 @@ class SoundTouchClient:
             msg = "%s DeviceId='%s'" % (msg, self.Device.DeviceId)
             msg = "%s Host='%s'" % (msg, self.Device.Host)
             msg = "%s Port='%s'" % (msg, self.Device.Port)
+            msg = "%s DLNAPort='%s'" % (msg, self.Device.DlnaPort)
         return msg
 
 

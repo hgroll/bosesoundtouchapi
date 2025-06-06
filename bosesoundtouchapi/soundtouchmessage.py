@@ -1,4 +1,5 @@
 # external package imports.
+from typing import Mapping
 from xml.etree.ElementTree import Element
 
 # our package imports.
@@ -15,7 +16,7 @@ class SoundTouchMessage:
     Element.
     """
     
-    def __init__(self, uri:SoundTouchUri=None, xmlMessage:str=None, response:Element=None) -> None:
+    def __init__(self, uri:SoundTouchUri=None, xmlMessage:str=None, response:Element=None, requestHeaders:dict=None) -> None:
         """
         Initializes a new instance of the class.
         
@@ -27,10 +28,19 @@ class SoundTouchMessage:
                 device, an xml formatted string is needed.
             response (xml.etree.ElementTree.Element):
                 The response object as an XML-Element.
+            requestHeaders (dict):
+                Request header that is to be placed into the http request headers, if the specified
+                uri service requires it; otherwise, None.
         """
+        # validation.
+        if requestHeaders is None:
+            requestHeaders = {}
+
+        self._IsRequestDataEncoded:bool = False
         self._Uri = uri
         self._XmlMessage = xmlMessage
         self._Response = response
+        self._RequestHeaders:Mapping[str, str] = requestHeaders
 
       
     def __repr__(self) -> str:
@@ -42,11 +52,35 @@ class SoundTouchMessage:
 
 
     @property
+    def HasRequestHeaders(self) -> bool:
+        """ 
+        Returns True if request headers are present, and should be supplied as part of the 
+        http request headers; otherwise, False.
+        """
+        return self._RequestHeaders is not None and len(self._RequestHeaders) != 0
+
+
+    @property
     def HasXmlMessage(self) -> bool:
         """ 
         Returns True if an xml message was returned with the response; otherwise, False. 
         """
         return self._XmlMessage is not None
+
+
+    @property
+    def IsRequestDataEncoded(self) -> bool:
+        """ 
+        Indicates if the `XmlMessage` property is already encoded (True) or not (False).
+        """
+        return self._IsRequestDataEncoded
+
+    @IsRequestDataEncoded.setter
+    def IsRequestDataEncoded(self, value:bool):
+        """ 
+        Sets the IsRequestDataEncoded property value.
+        """
+        self._IsRequestDataEncoded = value
 
 
     @property
@@ -56,6 +90,15 @@ class SoundTouchMessage:
         if the response requires further processing.
         """
         return self._Response and len(self._Response) != 0
+
+
+    @property
+    def RequestHeaders(self) -> Mapping[str, str]: 
+        """ 
+        Request header data that is to be sent with the http request body, if the specified
+        uri service requires it.
+        """
+        return self._RequestHeaders
 
 
     @property

@@ -44,7 +44,14 @@ class SoundTouchDevice:
     Click the **Sample Code** links in the individual methods for sample code examples.
     """
 
-    def __init__(self, host:str, connectTimeout:int=30, proxyManager:ProxyManager=None, port:int=8090) -> None:
+    def __init__(
+        self, 
+        host:str, 
+        connectTimeout:int=30, 
+        proxyManager:ProxyManager=None, 
+        port:int=8090, 
+        dlna_port:int=8091,
+        ) -> None:
         """
         Initializes a new instance of the class.
         
@@ -63,6 +70,9 @@ class SoundTouchDevice:
             port (int):
                 IPV4 port number the Bose WebAPI is listening on for incoming requests on the device.
                 Default is 8090, the standard WebAPI port number.
+            dlna_port (int):
+                IPV4 port number the Bose DLNA API is listening on for incoming requests on the device.
+                Default is 8091, the standard DLNA API port number.
                 
         Raises:
             SoundTouchError:
@@ -85,6 +95,7 @@ class SoundTouchDevice:
         self._Information:Information = Information()
         self._Host:str = host
         self._Port:int = int(port)
+        self._DlnaPort:int = int(dlna_port)
         self._SupportedUris:list[SoundTouchUri] = []
         self._SupportedUrls:SupportedUrls = None
         self._UnknownUrlNames:list[str] = []
@@ -232,6 +243,16 @@ class SoundTouchDevice:
         Type of device as assigned by the manufacturer (e.g. 'SoundTouch 10', 'SoundTouch 300', etc). 
         """
         return self._Information._DeviceType
+
+
+    @property
+    def DlnaPort(self) -> str:
+        """ 
+        IPV4 port number the Bose DLNA API is listening on for incoming requests on the device.  
+        Default is 8091, the standard DLNA API port number.  
+        This property is read-only, and supplied by the class constructor.
+        """
+        return self._DlnaPort
 
 
     @property
@@ -484,6 +505,7 @@ class SoundTouchDevice:
             'connect_timeout': self._ConnectTimeout,
             'host': self._Host,
             'ip_port': self._Port,
+            'dlna_port': self._DlnaPort,
             'log_read_url': self.LogReadUrl,
             'mac_address': self.MacAddress,
             'module_type': self.ModuleType,

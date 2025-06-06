@@ -149,6 +149,7 @@ PYTHONWARNINGS=always</Environment>
     <Compile Include="docs\include\samplecode\SmartInspectPython\ClassLogging.py" />
     <Compile Include="docs\include\samplecode\SmartInspectPython\MainLogging.py" />
     <Compile Include="docs\include\samplecode\SoundTouchClient\Action.py" />
+    <Compile Include="docs\include\samplecode\SoundTouchClient\PlayUrlDlna.py" />
     <Compile Include="docs\include\samplecode\SoundTouchClient\UpdateNowPlayingStatusForSource.py" />
     <Compile Include="docs\include\samplecode\SoundTouchClient\MediaSeekToTime.py" />
     <Compile Include="docs\include\samplecode\SoundTouchClient\ToggleZoneMember.py" />

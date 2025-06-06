@@ -6,6 +6,10 @@ Change are listed in reverse chronological order (newest to oldest).
 
 <span class="changelog">
 
+###### [ 1.0.78 ] - 2025/06/06
+
+  * Added method `SoundTouchClient.PlayUrlDlna` to play media from the given URL via the Bose DLNA API.
+
 ###### [ 1.0.77 ] - 2025/05/22
 
   * Replaced `telnetlib` with native `socket` calls for python 3.13 requirements.
